@@ -8,58 +8,70 @@
 
 A rule based proxy For Mac base on [Clash](https://github.com/Dreamacro/clash).
 
-### <b>Star and Support the upstream [Clash](https://github.com/Dreamacro/clash) , Thank You!</b>
-
-Telegram Group: [Join](https://t.me/clash_discuss)
-
-# Features
-
-HTTP/HTTPS and SOCKS proxy
-Surge like configuration
-GeoIP rule support
 
 
+## Features
 
-# Install
+- HTTP/HTTPS and SOCKS protocol
+- Surge like configuration
+- GeoIP rule support
+- Support Vmess/Shadowsocks/Socks5
+- Support for Netfilter TCP redirect
+
+## Install
 
 You can download from [release](https://github.com/yichengchen/clashX/releases) page
 
+## Build
+- Download mmdb from http://geolite.maxmind.com/download/geoip/database/GeoLite2-Country.tar.gz unzip and put it in the `ClashX/Support Files/Country.mmdb`.
 
-# Config
-You can use config generator in Status Bar Menu "Config" section.
-Config support most of surge rules.
+- Open the `ClashX/Resources` folder and clone the dashboard project.
+  ```
+  git clone -b gh-pages git@github.com:Dreamacro/clash-dashboard.git dashboard
+  ```
+- Build clash core. 
+  ```
+  go build -buildmode=c-archive
+  ```
+- Build and run.
 
-Configuration file at $HOME/.config/clash/config.ini
-
-Below is a simple demo configuration file:
-```
-[General]
-port = 7890
-socks-port = 7891
-
-# A RESTful API for clash
-external-controller = 127.0.0.1:8080 // do not change this line when you are using clashX
-
-[Proxy]
-# name = ss, server, port, cipher, password
-# The types of cipher are consistent with go-shadowsocks2
-# support AEAD_AES_128_GCM AEAD_AES_192_GCM AEAD_AES_256_GCM AEAD_CHACHA20_POLY1305 AES-128-CTR AES-192-CTR AES-256-CTR AES-128-CFB AES-192-CFB AES-256-CFB CHACHA20-IETF XCHACHA20 RC4-MD5
-Proxy1 = ss, server1, port, AEAD_CHACHA20_POLY1305, password
-Proxy2 = ss, server2, port, AEAD_CHACHA20_POLY1305, password
-
-[Proxy Group]
-# url-test select which proxy will be used by benchmarking speed to a URL.
-# name = url-test, [proxys], url, interval(second)
-ProxyAuto = url-test, Proxy1, Proxy2, http://www.google.com/generate_204, 300
-
-Proxy = select, Proxy1, Proxy2 ,ProxyAuto // ProxyAuto should be placed before this line 
+## Config
 
 
-[Rule]
-DOMAIN-SUFFIX,google.com,Proxy
-DOMAIN-KEYWORD,google,Proxy
-DOMAIN-SUFFIX,ad.com,REJECT
-GEOIP,CN,DIRECT
-FINAL,,Proxy // notice there are two ","
+The default configuration directory is `$HOME/.config/clash`
+
+The default name of the configuration file is `config.yml`. You can use your custom config name and switch config in menu `Config` section.
+
+To Change the ports of ClashX, you need to modify the `config.ymal` file. The `General` section settings in your custom config file would be ignored.
+
+Checkout [Clash](https://github.com/Dreamacro/clash) or [SS-Rule-Snippet for Clash](https://github.com/Hackl0us/SS-Rule-Snippet/blob/master/LAZY_RULES/clash.yml) for more detail.
+
+## Advance Config
+### Change your status menu icon
+
+Place your icon file in the `~/.config/clash/menuImage.png`  then restart ClashX
+
+### Disable auto restore proxy setting.
 
 ```
+defaults write com.west2online.ClashX kDisableRestoreProxy -bool true
+```
+
+### Change default system ignore list.
+
+- Download sample plist in the [Here](proxyIgnoreList.plist) and place in the
+
+  ```
+  ~/.config/clash/proxyIgnoreList.plist
+  ```
+
+- Edit the `proxyIgnoreList.plist` to set up your own proxy ignore list
+
+### Use url scheme to import remote config.
+
+- Using url scheme describe below
+
+  ```
+  clash://install-config?url=http%3A%2F%2Fexample.com
+  ```
+

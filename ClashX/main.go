@@ -1,47 +1,24 @@
 package main // import "github.com/yichengchen/clashX/ClashX"
-
 import (
 	"C"
-
-	"github.com/Dreamacro/clash/config"
 	"github.com/Dreamacro/clash/hub"
-	"github.com/Dreamacro/clash/proxy"
-	"github.com/Dreamacro/clash/tunnel"
-)
-import (
-	"os"
-	"os/signal"
-	"syscall"
+	"github.com/Dreamacro/clash/hub/route"
 )
 
 //export run
 func run() *C.char {
-	tunnel.Instance().Run()
-	proxy.Instance().Run()
-	hub.Run()
-
-	config.Init()
-	err := config.Instance().Parse()
-	if err != nil {
+	if err := hub.Parse(); err != nil {
 		return C.CString(err.Error())
-
 	}
 
 	return C.CString("success")
 }
 
-//export updateAllConfig
-func updateAllConfig() *C.char {
-	err := config.Instance().Parse()
-	if err != nil {
-		return C.CString(err.Error())
-	}
-	return C.CString("")
+//export setUIPath
+func setUIPath(path *C.char) {
+	route.SetUIPath(C.GoString(path))
 }
 
 func main() {
-	run()
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-	<-sigCh
+
 }

@@ -13,12 +13,23 @@ enum ClashProxyMode: String,Codable {
     case direct = "Direct"
 }
 
+extension ClashProxyMode {
+    var name: String {
+        switch self {
+        case .rule: return NSLocalizedString("Rule", comment: "")
+        case .global: return NSLocalizedString("Global", comment: "")
+        case .direct: return NSLocalizedString("Direct", comment: "")
+        }
+    }
+}
+
 enum ClashLogLevel:String,Codable {
     case info = "info"
     case warning = "warning"
     case error = "error"
     case debug = "debug"
-    case unknow = "unknow"
+    case silent = "silent"
+    case unknow = "unknown"
 }
 
 class ClashConfig:Codable {
@@ -29,13 +40,13 @@ class ClashConfig:Codable {
     var logLevel:ClashLogLevel
     
     private enum CodingKeys : String, CodingKey {
-        case port, socketPort = "socket-port", allowLan = "allow-lan", mode, logLevel = "log-level"
+        case port, socketPort = "socks-port", allowLan = "allow-lan", mode, logLevel = "log-level"
     }
     
-    static func fromData(_ data:Data)->ClashConfig{
+    static func fromData(_ data:Data)->ClashConfig?{
         let decoder = JSONDecoder()
         let model = try? decoder.decode(ClashConfig.self, from: data)
-        return model!
+        return model
     }
     
     func copy() -> ClashConfig? {

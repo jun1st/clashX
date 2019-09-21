@@ -18,57 +18,62 @@ class StatusItemView: NSView {
     @IBOutlet var uploadSpeedLabel: NSTextField!
     @IBOutlet var downloadSpeedLabel: NSTextField!
     @IBOutlet weak var speedContainerView: NSView!
+    var updating = false
+    
     weak var statusItem:NSStatusItem?
     var disposeBag = DisposeBag()
-    var isDarkMode = false
     
-    var onPopUpMenuAction:(()->())? = nil
     
-    static func create(statusItem:NSStatusItem?,statusMenu:NSMenu)->StatusItemView{
+    static func create(statusItem:NSStatusItem?)->StatusItemView{
         var topLevelObjects : NSArray?
         if Bundle.main.loadNibNamed("StatusItemView", owner: self, topLevelObjects: &topLevelObjects) {
             let view = (topLevelObjects!.first(where: { $0 is NSView }) as? StatusItemView)!
             view.statusItem = statusItem
-            view.menu = statusMenu
             view.setupView()
-            statusMenu.delegate = view
             return view
         }
         return NSView() as! StatusItemView
     }
     
     func setupView() {
-        let darkModeObservable = UserDefaults.standard
-            .rx.observe(String.self, "AppleInterfaceStyle").map { $0 as AnyObject };
         let proxySetObservable = ConfigManager.shared.proxyPortAutoSetObservable.map { $0 as AnyObject }
-        Observable
-            .of(darkModeObservable,proxySetObservable)
-            .merge()
+        proxySetObservable
             .bind { [weak self] _ in
                 guard let self = self else {return}
-                let darkMode =
-                    UserDefaults.standard.string(forKey: "AppleInterfaceStyle") ?? "Light" == "Dark"
                 let enableProxy = ConfigManager.shared.proxyPortAutoSet;
                 
                 let customImagePath = (NSHomeDirectory() as NSString).appendingPathComponent("/.config/clash/menuImage.png")
                 
-                let selectedColor = darkMode ? NSColor.white : NSColor.black
-                let unselectedColor = NSColor.gray
+                let selectedColor = NSColor.red
+                let unselectedColor: NSColor
+                if #available(OSX 10.14, *) {
+                    unselectedColor = selectedColor.withSystemEffect(.disabled)
+                } else {
+                    unselectedColor = selectedColor.withAlphaComponent(0.5)
+                }
+                
                 let image = NSImage(contentsOfFile: customImagePath) ??
                     NSImage(named: "menu_icon")!.tint(color: enableProxy ? selectedColor : unselectedColor)
                 
                 self.imageView.image = image
                 
-                self.uploadSpeedLabel.textColor = darkMode ? NSColor.white : NSColor.black
+                self.uploadSpeedLabel.textColor = NSColor.black
                 self.downloadSpeedLabel.textColor = self.uploadSpeedLabel.textColor
-                self.isDarkMode = darkMode
                 
+                self.updateStatusItemView()
         }.disposed(by: disposeBag)
         
-
+        if #available(OSX 10.11, *) {
+            let font = NSFont.systemFont(ofSize: 9, weight: .regular)
+            uploadSpeedLabel.font = font
+            downloadSpeedLabel.font = font
+        }
+        
     }
     
     func updateSpeedLabel(up:Int,down:Int) {
+        guard !self.speedContainerView.isHidden else {return}
+        
         let kbup = up/1024
         let kbdown = down/1024
         var finalUpStr:String
@@ -87,41 +92,29 @@ class StatusItemView: NSView {
         DispatchQueue.main.async {
             self.downloadSpeedLabel.stringValue = finalDownStr
             self.uploadSpeedLabel.stringValue = finalUpStr
+            if self.updating {Logger.log(msg: "update during update"); return}
+            self.updating = true
+            self.updateStatusItemView()
+            self.updating = false
         }
+        
    
     }
     
     func showSpeedContainer(show:Bool) {
         self.speedContainerView.isHidden = !show
+        updateStatusItemView()
     }
     
-    override func mouseDown(with event: NSEvent) {
-        onPopUpMenuAction?()
-        statusItem?.popUpMenu(self.menu!)
+    func updateStatusItemView() {
+        statusItem?.updateImage(withView: self)
     }
 }
 
-extension StatusItemView:NSMenuDelegate {
-    func menuWillOpen(_ menu: NSMenu) {
-        drawHighlight(highlight: true)
 
-    }
-    
-    func menuDidClose(_ menu: NSMenu) {
-        drawHighlight(highlight: false)
-    }
-    
-    
-    func drawHighlight(highlight:Bool) {
-        let image = NSImage(size: self.frame.size)
-        image.lockFocus()
-        statusItem?.drawStatusBarBackground(in: self.bounds, withHighlight: highlight)
-        image.unlockFocus()
-        self.layer?.contents = image
-        
-        if !self.isDarkMode {
-            self.uploadSpeedLabel.textColor = highlight ? NSColor.white : NSColor.black
-            self.downloadSpeedLabel.textColor = highlight ? NSColor.white : NSColor.black
-        }
+extension NSStatusItem {
+    func updateImage(withView: NSView) {
+        image = NSImage(data: withView.dataWithPDF(inside: withView.bounds))
+        image?.isTemplate = true
     }
 }

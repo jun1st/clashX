@@ -13,20 +13,18 @@ import RxSwift
 import RxCocoa
 
 class ClashWebViewContoller: NSViewController {
-    let webview: WKWebView = CustomWKWebView()
+    let webview: CustomWKWebView = CustomWKWebView()
     var bridge:WebViewJavascriptBridge?
     var disposeBag = DisposeBag()
     
     @IBOutlet weak var effectView: NSVisualEffectView!
-    
-    static func enableDashBoard() -> Bool {
-        return UserDefaults.standard.bool(forKey: "kEnableDashboard")
-    }
+
     
     override func viewDidLoad() {
         super.viewDidLoad()
         webview.uiDelegate = self
         webview.navigationDelegate = self
+
         if #available(OSX 10.11, *) {
             webview.customUserAgent = "ClashX Runtime"
         } else {
@@ -34,28 +32,14 @@ class ClashWebViewContoller: NSViewController {
         }
         if NSAppKitVersion.current.rawValue > 1500 {
             webview.setValue(false, forKey: "drawsBackground")
-        }
-        else {
+        } else {
             webview.setValue(true, forKey: "drawsTransparentBackground")
         }
+        webview.frame = self.view.bounds
         view.addSubview(webview)
 
-
-        webview.translatesAutoresizingMaskIntoConstraints = false
-        let attributes:[NSLayoutConstraint.Attribute] = [.top,.left,.bottom,.right,.top]
-        for attribute in attributes {
-
-            let constraint = NSLayoutConstraint(item: webview,
-                                                attribute: attribute,
-                                                relatedBy: .equal,
-                                                toItem: view,
-                                                attribute: attribute ,
-                                                multiplier: 1, constant: 0);
-            constraint.priority = NSLayoutConstraint.Priority(rawValue: 100);
-            view.addConstraint(constraint)
-        }
-
-        bridge = JsBridgeHelper.initJSbridge(webview: webview, delegate: self)
+        bridge = JsBridgeUtil.initJSbridge(webview: webview, delegate: self)
+        registerExtenalJSBridgeFunction()
 
         webview.configuration.preferences.setValue(true, forKey: "developerExtrasEnabled")
 
@@ -64,27 +48,75 @@ class ClashWebViewContoller: NSViewController {
             self?.bridge?.callHandler("onConfigChange")
             }.disposed(by: disposeBag)
 
+        loadWebRecourses()
+        
+        NSEvent.addLocalMonitorForEvents(matching: .keyDown) {[weak self] in
+            self?.keyDown(with: $0)
+            return $0
+        }
+    }
+    
+    func loadWebRecourses() {
         // defaults write com.west2online.ClashX webviewUrl "your url"
-        let url = UserDefaults.standard.string(forKey: "webviewUrl") ?? "http://127.0.0.1:8080"
-        self.webview.load(URLRequest(url: URL(string: url)!))
+        let defaultUrl = "\(ConfigManager.apiUrl)/ui/"
+        let url = UserDefaults.standard.string(forKey: "webviewUrl") ?? defaultUrl
+        if let url = URL(string: url) {
+            webview.load(URLRequest(url: url, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData, timeoutInterval: 0))
+        }
     }
     
     override func viewWillAppear() {
         super.viewWillAppear()
-        self.view.window?.titleVisibility = .hidden
-        self.view.window?.titlebarAppearsTransparent = true
-        self.view.window?.styleMask.insert(.fullSizeContentView)
+        view.window?.titleVisibility = .hidden
+        view.window?.titlebarAppearsTransparent = true
+        view.window?.styleMask.insert(.fullSizeContentView)
 
         NSApp.activate(ignoringOtherApps: true)
-        self.view.window?.makeKeyAndOrderFront(self)
+        view.window?.makeKeyAndOrderFront(self)
         
-        self.view.window?.isOpaque = false
-        self.view.window?.backgroundColor = NSColor.clear
+        view.window?.isOpaque = false
+        view.window?.backgroundColor = NSColor.clear
+        view.window?.styleMask.remove(.resizable)
+        view.window?.styleMask.remove(.miniaturizable)
         
-
+        if NSApp.activationPolicy() == .accessory {
+            NSApp.setActivationPolicy(.regular)
+        }
     }
     
+    deinit {
+        NSApp.setActivationPolicy(.accessory)
+    }
+    
+    override func keyDown(with event: NSEvent) {
+        switch event.modifierFlags.intersection(.deviceIndependentFlagsMask) {
+        case [.command,.capsLock]:fallthrough
+        case [.command]:
+            if event.characters?.lowercased() == "w" {
+                self.view.window?.close()
+            }
+        default:
+            break
+        }
+    }
+    
+
+    
+    
 }
+
+extension ClashWebViewContoller {
+    func registerExtenalJSBridgeFunction(){
+        self.bridge?.registerHandler("setDragAreaHeight") {
+            [weak self] (anydata, responseCallback) in
+            if let height = anydata as? CGFloat {
+                self?.webview.dragableAreaHeight = height;
+            }
+            responseCallback?(nil)
+        }
+    }
+}
+
 
 extension ClashWebViewContoller:WKUIDelegate,WKNavigationDelegate {
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
@@ -111,18 +143,26 @@ extension ClashWebViewContoller:WKUIDelegate,WKNavigationDelegate {
         }
         return nil;
     }
+    
+}
+extension ClashWebViewContoller:WebResourceLoadDelegate {
+    
 }
 
-
 class CustomWKWebView: WKWebView {
+    
+    var dragableAreaHeight:CGFloat = 20;
+    let alwaysDragableLeftAreaWidth:CGFloat = 150;
+    
     override func mouseDown(with event: NSEvent) {
         super.mouseDown(with: event)
+        let x = event.locationInWindow.x
         let y = (self.window?.frame.size.height ?? 0) - event.locationInWindow.y
-        if y<20 {
+        
+        if x < alwaysDragableLeftAreaWidth || y < dragableAreaHeight {
             if #available(OSX 10.11, *) {
                 self.window?.performDrag(with: event)
             }
         }
-        
     }
 }
